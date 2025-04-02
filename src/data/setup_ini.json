@@ -1,0 +1,21 @@
+{
+    "Credentials": {
+        "host":"172.31.1.53",
+        "username":"madaccess",
+        "password":"materials",
+        "database":"cm_db",
+        "charset":"utf8"
+                 },
+    "Paths": {
+        "SamOrd":"P:/TC_BU/W-PY_DATA/rpt/mag/data_mad/MADSamOrd.xlsx",
+        "CusReq":"P:/TC_BU/W-PY_DATA/rpt/mag/data_mad/MADCusReq.xlsx",
+        "SAPCod":"P:/TC_BU/W-PY_DATA/rpt/mag/data_mad/MADCusReqSAPCod.xlsx"
+            },
+    "Parameters":{
+        "min_date":"2023-01-01",
+        "plant_in":"(1,3,4)",
+        "status_samord_min":"6",
+        "status_cusreq_min":"4",
+         "days_on_time":"2"
+    }
+}
