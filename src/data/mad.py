@@ -6,7 +6,7 @@ from .setup import Setup
 from .timer import Timer
 
 class MAD:
-    def __init__(self, credentials: Setup().Credentials):
+    def __init__(self, credentials: "Setup.Credentials"):
         self.host = credentials.host
         self.user = credentials.username
         self.password = credentials.password

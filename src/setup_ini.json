@@ -9,7 +9,7 @@
     "Paths": {
         "SamOrd":"P:/TC_BU/W-PY_DATA/rpt/mag/data_mad/MADSamOrd.xlsx",
         "CusReq":"P:/TC_BU/W-PY_DATA/rpt/mag/data_mad/MADCusReq.xlsx",
-        "SAPCod":"P:/TC_BU/W-PY_DATA/rpt/mag/data_mad/MADCusReqSAPCod.xlsx"
+        "SapCod":"P:/TC_BU/W-PY_DATA/rpt/mag/data_mad/MADCusReqSAPCod.xlsx"
             },
     "Parameters":{
         "min_date":"2023-01-01",

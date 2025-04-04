@@ -6,8 +6,13 @@ default_path="setup_ini.json" #il percorso del file json di inizilizzazione dei 
 class Setup:
     _config = {}
 
-    def __init__(self, json_path: str=default_path):
-        self.json_path = Path(__file__).parent / Path(default_path)  #uso il path di questo modulo altrimenti usa quello del caller
+    def __init__(self, json_path: str):
+        """Inizializza la classe Setup e carica il file JSON."""
+        # Se il percorso non è assoluto, lo converte in un percorso assoluto  
+        if json_path:
+            self.json_path = Path(json_path).resolve() 
+        else:     
+            self.json_path = Path(__file__).parent / Path(default_path)  #uso il path di questo modulo altrimenti usa quello del caller
         self.load(self.json_path)
 
     def load(self, file_path):

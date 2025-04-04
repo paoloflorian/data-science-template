@@ -4,7 +4,9 @@ import pandas as pd
 import numpy as np
 import subprocess, os, sys
 
-sys.path.insert(0, r'C:\Users\100700375\Documents\py_projects\MAD\src\data')
+
+sys.path.insert(0, r'C:\Users\100700375\Documents\py_projects\MAD\src')
+from pathlib import Path
 from data.setup import Setup
 from data.mad import MAD
 from data.timer import Timer
@@ -14,17 +16,18 @@ def main():
     Timer.Display('Inizio elaborazione')
     t=Timer('Connessione e Import')
     t.start()
-    #controllo che il disco T sia collegato, altrimenti lo collego
+    #controllo che il disco P sia collegato, altrimenti lo collego
     if not os.path.exists("P:\\"):  
         subprocess.run(["C:\\Script\\dept_connect.bat"], shell=True)
     #carico i parametri di setup
-    setup= Setup()
+    #setup= Setup(r"C:\Users\100700375\Documents\py_projects\MAD\src\setup_ini.json")
+    setup= Setup(Path(__file__).parent / Path("setup_ini.json"))
     #carico in locale i parametri di query e arricchimento dati
-    min_date=setup.Parameters.min_date
-    plant_in=setup.Parameters.plant_in
-    status_samord_min=setup.Parameters.status_samord_min
-    status_cusreq_min=setup.Parameters.status_cusreq_min
-    days_on_time=int(setup.Parameters.days_on_time)
+    min_date=setup.Parameters.min_date #data da cui iniziare a leggere i dati
+    plant_in=setup.Parameters.plant_in # "(1,3,4) vcp, ccp,cfp
+    status_samord_min=setup.Parameters.status_samord_min #da attesa produzione in poi
+    status_cusreq_min=setup.Parameters.status_cusreq_min #da attesa valutazione in poi
+    days_on_time=int(setup.Parameters.days_on_time) #numero di giorni <=per cui ttm e otd sono on time
 
     #SQL per i dati di samord
     RetriveSamOrd_query=f"""SELECT
@@ -128,7 +131,8 @@ def main():
             WHEN 3 THEN 'N'
         END as RequestApproved,
         SAMREQ.DateIns,SAMREQ.DateAssessment,SAMREQ.DateMod,SAMREQ.DateSalesBegin,
-        EMP2.EmployeeName as EmployeeReq,EMP.EmployeeName as EvalMngName
+        EMP2.EmployeeName as EmployeeReq,EMP.EmployeeName as EvalMngName,
+        COUNT(SAPCODE.SapCod) as SAPCodCount, MIN(SAPCODE.modtime) as SAPCodFirst,MAX(SAPCODE.modtime) as SAPCodLast
         FROM tblsamrequests as SAMREQ 
         INNER JOIN tlkpplant as Plant on SAMREQ.IDPlantReq= Plant.IDPlant 
         INNER JOIN tlkpbu as BU ON SAMREQ.IDBU=BU.IDBU 
@@ -137,8 +141,45 @@ def main():
         LEFT JOIN tlkpmad as MAD ON SAMREQ.IDMAD=MAD.IDMAD
         LEFT JOIN tblemployees as EMP ON SAMREQ.IDEmployeeEvalMngr =EMP.EmployeeID 
         LEFT JOIN tblemployees as EMP2 ON SAMREQ.IDEmpIns =EMP2.EmployeeID
-        WHERE SAMREQ.DateIns>='{min_date}' AND Plant.IDPlant IN {plant_in} AND STATO.StatoReq >{status_cusreq_min};"""
-
+        LEFT JOIN tblreqzzsapcode as SAPCODE ON SAMREQ.IDSamReq=SAPCODE.IDSamReq
+        WHERE SAMREQ.DateIns>='{min_date}' AND Plant.IDPlant IN {plant_in} AND STATO.StatoReq >{status_cusreq_min}
+        GROUP BY SAMREQ.IDSamReq;
+        """
+    #SQL per i dati di sapcode
+    RetriveSapCod_query=f"""
+    SELECT 
+    SAMREQ.IDSamReq as CusReq,
+    CLIENTI.Cliente as CustomerName,
+    SAMREQ.TitoloReq as Title,
+    STATO.DesStato_ITA as StatusDesc,
+    IF(SAMREQ.MADType=1,'STD','DEV') AS ReqType,
+    CASE SAMREQ.IsNewPrd
+            WHEN 1 THEN 'NA'
+            WHEN 2 THEN 'New'
+            WHEN 3 THEN 'SAP'
+    END as IsNewPrd,
+    CASE SAMREQ.IsConverted
+            WHEN 1 THEN 'NA'
+            WHEN 2 THEN 'Converted'
+            WHEN 3 THEN 'Foam'
+    END as Conv_Foam,
+    MAD.MADDesc as MAD,
+    SUBSTRING(Plant.Plant,1,3) as PlantName,
+    SUBSTRING(BU.BusinesseUnit,1,2) as BU, 
+    IF(SAPCODE.IsZZ=-1,'Y','N') as IsZZ,    #-1=ZZ, 0=Non ZZ
+    SAPCODE.SapCod as SAPCod, SAPCODE.SapDes as SapDes, 
+    SAPCODE.modtime as DateMod, USERS.EmployeeName
+    FROM tblreqzzsapcode as SAPCODE 
+    INNER JOIN tblsamrequests as SAMREQ ON SAMREQ.IDSamReq=SAPCODE.IDSamReq 
+    INNER JOIN tlkpplant as Plant on SAMREQ.IDPlantReq= Plant.IDPlant 
+    INNER JOIN tlkpbu as BU ON SAMREQ.IDBU=BU.IDBU 
+    INNER JOIN ztblsamreqsts as STATO ON SAMREQ.StatoReq=STATO.StatoReq 
+    INNER JOIN tblclienti as CLIENTI ON SAMREQ.IDCliente=CLIENTI.IDCliente 
+    LEFT JOIN tblemployees as USERS ON SAPCODE.IDEmpIns=USERS.EmployeeID
+    LEFT JOIN tlkpmad as MAD ON SAMREQ.IDMAD=MAD.IDMAD
+    WHERE SAMREQ.DateIns>='{min_date}' AND Plant.IDPlant IN {plant_in} AND STATO.StatoReq >{status_cusreq_min};
+    """
+    
     #creo l'oggetto MAD per la connessione al db
     db = MAD(setup.Credentials)
     #apro la connessione al db
@@ -172,6 +213,12 @@ def main():
                     .sort_values(by=['DateIns'],ascending=[True])
     )
     Timer.Display('Import CusReq','OK')
+
+
+    Timer.Display('Import SapCod','[..]',cr=0)
+    df_SapCod= db.execute_query(RetriveSapCod_query)
+    Timer.Display('Import SapCod','OK')
+
     db.close_connection()
     t.stop()
 
@@ -180,6 +227,7 @@ def main():
     #salvo i dataframe su file excel
     db.SaveFile(df_SamOrd,setup.Paths.SamOrd)
     db.SaveFile(df_Cusreq,setup.Paths.CusReq)
+    db.SaveFile(df_SapCod,setup.Paths.SapCod)
     t.stop()
     Timer.Display('Fine elaborazione')
     
